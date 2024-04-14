@@ -1,7 +1,7 @@
 AI4AQ
 ==============================
 
-Modeling the relationship between outdoor and indoor air quality.
+Modeling the relationship between outdoor and indoor air quality. Testing yaml.
 
 Project Organization
 ------------
