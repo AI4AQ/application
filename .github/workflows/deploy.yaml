@@ -45,19 +45,15 @@ jobs:
           aws --version
           sudo curl "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" -o "/usr/local/bin/lightsailctl"
           sudo chmod +x /usr/local/bin/lightsailctl
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+  
+      - name: Configure AWS Credentials Action for GitHub Actions
+        uses: aws-actions/configure-aws-credentials@v4.0.2
         with:
-          role-to-assume: ${{ secrets.AWS_ARN_OICN_ACCESS }}
-          role-session-name: GitHub_to_AWS_via_FederatedOIDC
-          aws-region: us-west-2
-
-      - name: Push the Docker Image to lightsail
-        env:
           AWS_REGION: us-west-2
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Push the Docker Image to lightsail
         run: aws lightsail push-container-image --service-name ai4aq-app-service --label ai4aq-app --image ai4aq-app:arch
 
       - name: Save updated LIGHTSAIL_IMAGE_TAG 
