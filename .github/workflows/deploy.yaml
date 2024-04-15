@@ -11,35 +11,21 @@ permissions:
   contents: read 
 
 jobs:
-  integration:
+  build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./
+    
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Setup Python
-        uses: actions/setup-python@v1
-        with:
-          python-version: 3.11
-
-      - uses: actions/cache@v3
-        id: cache
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.*') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install packages requirements
-        run: |
-          make install
-
-      - name: Run Linting files
-        run: |
-          make lint
+        uses: actions/checkout@v2
+      
+      - name: Build Docker image
+        run: docker buildx build -t jaredfeldman/ai4aq:ai4aq-app --platform linux/amd64 --load .
+      
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKER_PAT }}" | docker login --username jaredfeldman --password-stdin
+      
+      - name: Push Docker image to Docker Hub
+        run: docker push jaredfeldman/ai4aq:ai4aq-app
 
   deploy:
     runs-on: ubuntu-latest
