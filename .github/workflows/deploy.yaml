@@ -53,8 +53,14 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Push the Docker Image to lightsail
-        run: aws lightsail push-container-image --service-name ai4aq-app-service --label ai4aq-app --image jaredfeldman/ai4aq:ai4aq-app
+      - name: Pull Docker image from Docker Hub
+        run: docker pull jaredfeldman/ai4aq:ai4aq-app
+
+      - name: Tag Docker image for Lightsail
+        run: docker tag jaredfeldman/ai4aq:ai4aq-app lightsail-image:latest
+
+      - name: Push the Docker Image to Lightsail
+        run: aws lightsail push-container-image --service-name ai4aq-app-service --label ai4aq-app --image lightsail-image:latest
 
       - name: Save updated LIGHTSAIL_IMAGE_TAG 
         run: |
