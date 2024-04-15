@@ -1,34 +1,131 @@
-# Test pipeline to assume role.
-name: Connect to an AWS role from a GitHub repository
-
-# Controls when the action will run. Invokes the workflow on push events but only for the main branch
+name: Exceed Backend workflow
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
-env:
-  
-  AWS_REGION : "us-west-2" #Change to reflect your Region
 
-# Permission can be added at job level or workflow level    
-permissions:
-      id-token: write   # This is required for requesting the JWT
-      contents: read    # This is required for actions/checkout
+permissions: 
+  id-token: write # Reequired for requesting the jwt token
+  contents: read 
+
 jobs:
-  AssumeRoleAndCallIdentity:
+  integration:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./
     steps:
-      - name: Git clone the repository
+      - name: Checkout code
         uses: actions/checkout@v3
-      - name: configure aws credentials
-        uses: aws-actions/configure-aws-credentials@v1.7.0
+
+      - name: Setup Python
+        uses: actions/setup-python@v1
         with:
-          role-to-assume: arn:aws:iam::654609948557:role/GitHubAction-AssumeRoleWithAction #change to reflect your IAM role’s ARN
-          role-session-name: GitHub_to_AWS_via_FederatedOIDC
-          aws-region: ${{ env.AWS_REGION }}
-      # Hello from AWS: WhoAmI
-      - name: Sts GetCallerIdentity
+          python-version: 3.11
+
+      - uses: actions/cache@v3
+        id: cache
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.*') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install packages requirements
         run: |
-          aws sts get-caller-identity
+          make install
+
+      - name: Run Linting files
+        run: |
+          make lint
+
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    needs: integration
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Upgrade AWS CLI version and setup lightsailctl
+        run: |
+          aws --version
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update
+          which aws
+          aws --version
+          sudo curl "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" -o "/usr/local/bin/lightsailctl"
+          sudo chmod +x /usr/local/bin/lightsailctl
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.AWS_ARN_OICN_ACCESS }}
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: us-west-2
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Create Build and Tag tag
+        env:
+          IMAGE_TAG: latest
+          IMAGE_SHA_TAG: ${{ github.sha }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build -t $ECR_REGISTRY/${{vars.ECR_REPOSITORY}}:$IMAGE_TAG .
+          docker build -t $ECR_REGISTRY/${{vars.ECR_REPOSITORY}}:$IMAGE_SHA_TAG .
+          docker push $ECR_REGISTRY/${{vars.ECR_REPOSITORY}}:$IMAGE_TAG
+          docker push $ECR_REGISTRY/${{vars.ECR_REPOSITORY}}:$IMAGE_SHA_TAG
+
+      - name: Push the Docker Image to lightsail
+        env: 
+          IMAGE_SHA_TAG: ${{ github.sha }}
+          IMAGE_URL: ${{vars.LIGHTSAIL_IMAGE}}:${{ github.sha }}
+        run: >
+          aws lightsail push-container-image
+          --service-name ${{ vars.SERVICE_NAME }}
+          --image $IMAGE_URL
+          --region us-west-2
+          --label git-push
+
+      - name: Save updated LIGHTSAIL_IMAGE_TAG 
+        run: |
+          echo "LIGHTSAIL_DOCKER_IMAGE=$(aws lightsail get-container-images --service-name ${{ vars.SERVICE_NAME }} --region us-west-2 | jq -r .containerImages[0].image)"  >> $GITHUB_ENV
+      
+      - name: Start New Deployment to Light Sail
+        run: |
+          aws lightsail create-container-service-deployment  --region us-west-2 \
+          --service-name ${{vars.SERVICE_NAME}} \
+          --output yaml \
+          --containers "{
+            \"${{vars.SERVICE_NAME}}\": {
+              \"image\": \"$LIGHTSAIL_DOCKER_IMAGE\",
+              \"environment\": {
+                  \"VERSION\": \"${{github.run_number}}\"
+                },
+              \"ports\": {
+                \"8000\": \"HTTP\"
+              }
+            }
+          }" \
+          --public-endpoint "{
+            \"containerName\": \"${{vars.SERVICE_NAME}}\",
+            \"containerPort\": 8000,
+            \"healthCheck\": {
+              \"path\": \"/healthcheck/liveness\",
+              \"intervalSeconds\": 10
+            }
+          }"
+
+      - name: Debug container logs Update
+        run: >
+          aws lightsail get-container-log
+          --region us-west-2
+          --service-name ${{ vars.SERVICE_NAME }}
+          --container-name ${{vars.SERVICE_NAME}}
+          --output yaml
