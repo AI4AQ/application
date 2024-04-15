@@ -30,7 +30,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
-    needs: integration
+    needs: build
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
