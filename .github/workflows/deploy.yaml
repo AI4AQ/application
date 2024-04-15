@@ -91,5 +91,4 @@ jobs:
           --public-endpoint "{
             \"containerName\": \"flask\",
             \"containerPort\": 5000
-            }
           }"
