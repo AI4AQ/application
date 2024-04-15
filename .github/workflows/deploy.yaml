@@ -54,7 +54,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Push the Docker Image to lightsail
-        run: aws lightsail push-container-image --service-name ai4aq-app-service --label ai4aq-app --image ai4aq:ai4aq-app
+        run: aws lightsail push-container-image --service-name ai4aq-app-service --label ai4aq-app --image jaredfeldman/ai4aq:ai4aq-app
 
       - name: Save updated LIGHTSAIL_IMAGE_TAG 
         run: |
