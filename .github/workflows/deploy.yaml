@@ -53,31 +53,8 @@ jobs:
           role-session-name: GitHub_to_AWS_via_FederatedOIDC
           aws-region: us-west-2
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: Create Build and Tag tag
-        env:
-          IMAGE_TAG: latest
-          IMAGE_SHA_TAG: ${{ github.sha }}
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: |
-          docker build -t $ECR_REGISTRY/${{vars.ECR_REPOSITORY}}:$IMAGE_TAG .
-          docker build -t $ECR_REGISTRY/${{vars.ECR_REPOSITORY}}:$IMAGE_SHA_TAG .
-          docker push $ECR_REGISTRY/${{vars.ECR_REPOSITORY}}:$IMAGE_TAG
-          docker push $ECR_REGISTRY/${{vars.ECR_REPOSITORY}}:$IMAGE_SHA_TAG
-
       - name: Push the Docker Image to lightsail
-        env: 
-          IMAGE_SHA_TAG: ${{ github.sha }}
-          IMAGE_URL: ${{vars.LIGHTSAIL_IMAGE}}:${{ github.sha }}
-        run: >
-          aws lightsail push-container-image
-          --service-name ${{ vars.SERVICE_NAME }}
-          --image $IMAGE_URL
-          --region us-west-2
-          --label git-push
+        run: aws lightsail push-container-image --service-name ai4aq-app-service --label ai4aq-app --image ai4aq-app:arch
 
       - name: Save updated LIGHTSAIL_IMAGE_TAG 
         run: |
