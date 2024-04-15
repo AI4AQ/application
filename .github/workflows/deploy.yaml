@@ -62,39 +62,34 @@ jobs:
       - name: Push the Docker Image to Lightsail
         run: aws lightsail push-container-image --service-name ai4aq-app-service --label ai4aq-app --image lightsail-image:latest
 
+### ^^Good
+
+#aws lightsail create-container-service-deployment --service-name ai4aq-app-service --containers file://containers.json --public-endpoint file://public-endpoint.json
+
       - name: Save updated LIGHTSAIL_IMAGE_TAG 
         run: |
-          echo "LIGHTSAIL_DOCKER_IMAGE=$(aws lightsail get-container-images --service-name ${{ vars.SERVICE_NAME }} --region us-west-2 | jq -r .containerImages[0].image)"  >> $GITHUB_ENV
-      
+          echo "LIGHTSAIL_DOCKER_IMAGE=$(aws lightsail get-container-images --service-name ai4aq-app-service --region us-west-2 | jq -r .containerImages[0].image)"  >> $GITHUB_ENV
+  
       - name: Start New Deployment to Light Sail
         run: |
           aws lightsail create-container-service-deployment  --region us-west-2 \
-          --service-name ${{vars.SERVICE_NAME}} \
+          --service-name ai4aq-app-service \
           --output yaml \
           --containers "{
-            \"${{vars.SERVICE_NAME}}\": {
+            \"flask\": {
               \"image\": \"$LIGHTSAIL_DOCKER_IMAGE\",
               \"environment\": {
                   \"VERSION\": \"${{github.run_number}}\"
+                  \"AWS_ACCESS_KEY_ID\": \"${{ secrets.AWS_ACCESS_KEY_ID }}\"
+                  \"AWS_SECRET_ACCESS_KEY\": \"${{ secrets.AWS_SECRET_ACCESS_KEY }}\"
                 },
               \"ports\": {
-                \"8000\": \"HTTP\"
+                \"5000\": \"HTTP\"
               }
             }
           }" \
           --public-endpoint "{
-            \"containerName\": \"${{vars.SERVICE_NAME}}\",
-            \"containerPort\": 8000,
-            \"healthCheck\": {
-              \"path\": \"/healthcheck/liveness\",
-              \"intervalSeconds\": 10
+            \"containerName\": \"flask\",
+            \"containerPort\": 5000
             }
           }"
-
-      - name: Debug container logs Update
-        run: >
-          aws lightsail get-container-log
-          --region us-west-2
-          --service-name ${{ vars.SERVICE_NAME }}
-          --container-name ${{vars.SERVICE_NAME}}
-          --output yaml
