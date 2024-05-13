@@ -1,4 +1,4 @@
-name: Exceed Backend workflow
+name: Push changes to Docker and Lightsail
 on:
   push:
     branches: [main]
@@ -27,68 +27,71 @@ jobs:
       - name: Push Docker image to Docker Hub
         run: docker push jaredfeldman/ai4aq:ai4aq-app
 
-  deploy:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    needs: build
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+######### ALL BELOW IS COMMENTED OUT ########
+# As of 5/13/2024, we are beginning to decommission our Lightsail application
+# and all supporting AWS services (S3, IAM, Lambda, etc.).
+# Below is all of the code that deployed our latest Docker image to Lightsail,
+# and subsequently updated our app. I am commenting this out so that we have it for reference,
+# but it will no longer run and any app changes will only update the Docker image with the code above.
 
-      - name: Upgrade AWS CLI version and setup lightsailctl
-        run: |
-          aws --version
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update
-          which aws
-          aws --version
-          sudo curl "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" -o "/usr/local/bin/lightsailctl"
-          sudo chmod +x /usr/local/bin/lightsailctl
+#  deploy:
+#    runs-on: ubuntu-latest
+#    if: github.event_name == 'push'
+#    needs: build
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v3
+
+#      - name: Upgrade AWS CLI version and setup lightsailctl
+#        run: |
+#          aws --version
+#          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+#          unzip awscliv2.zip
+#          sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update
+#          which aws
+#          aws --version
+#          sudo curl "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" -o "/usr/local/bin/lightsailctl"
+#          sudo chmod +x /usr/local/bin/lightsailctl
   
-      - name: Configure AWS Credentials Action for GitHub Actions
-        uses: aws-actions/configure-aws-credentials@v4.0.2
-        with:
-          aws-region: us-west-2
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#      - name: Configure AWS Credentials Action for GitHub Actions
+#        uses: aws-actions/configure-aws-credentials@v4.0.2
+#        with:
+#          aws-region: us-west-2
+#          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Pull Docker image from Docker Hub
-        run: docker pull jaredfeldman/ai4aq:ai4aq-app
+#      - name: Pull Docker image from Docker Hub
+#        run: docker pull jaredfeldman/ai4aq:ai4aq-app
 
-      - name: Tag Docker image for Lightsail
-        run: docker tag jaredfeldman/ai4aq:ai4aq-app lightsail-image:latest
+#      - name: Tag Docker image for Lightsail
+#        run: docker tag jaredfeldman/ai4aq:ai4aq-app lightsail-image:latest
 
-      - name: Push the Docker Image to Lightsail
-        run: aws lightsail push-container-image --service-name ai4aq-app-service --label ai4aq-app --image lightsail-image:latest
+#      - name: Push the Docker Image to Lightsail
+#        run: aws lightsail push-container-image --service-name ai4aq-app-service --label ai4aq-app --image lightsail-image:latest
 
-### ^^Good
-
-#aws lightsail create-container-service-deployment --service-name ai4aq-app-service --containers file://containers.json --public-endpoint file://public-endpoint.json
-
-      - name: Save updated LIGHTSAIL_IMAGE_TAG 
-        run: |
-          echo "LIGHTSAIL_DOCKER_IMAGE=$(aws lightsail get-container-images --service-name ai4aq-app-service --region us-west-2 | jq -r .containerImages[0].image)"  >> $GITHUB_ENV
+#      - name: Save updated LIGHTSAIL_IMAGE_TAG 
+#        run: |
+#          echo "LIGHTSAIL_DOCKER_IMAGE=$(aws lightsail get-container-images --service-name ai4aq-app-service --region us-west-2 | jq -r .containerImages[0].image)"  >> $GITHUB_ENV
   
-      - name: Start New Deployment to Light Sail
-        run: |
-          aws lightsail create-container-service-deployment  --region us-west-2 \
-          --service-name ai4aq-app-service \
-          --output yaml \
-          --containers "{
-            \"flask\": {
-              \"image\": \"$LIGHTSAIL_DOCKER_IMAGE\",
-              \"environment\": {
-                  \"VERSION\": \"${{github.run_number}}\",
-                  \"AWS_ACCESS_KEY_ID\": \"${{ secrets.AWS_ACCESS_KEY_ID }}\",
-                  \"AWS_SECRET_ACCESS_KEY\": \"${{ secrets.AWS_SECRET_ACCESS_KEY }}\"
-                },
-              \"ports\": {
-                \"5000\": \"HTTP\"
-              }
-            }
-          }" \
-          --public-endpoint "{
-            \"containerName\": \"flask\",
-            \"containerPort\": 5000
-          }"
+#      - name: Start New Deployment to Light Sail
+#        run: |
+#          aws lightsail create-container-service-deployment  --region us-west-2 \
+#          --service-name ai4aq-app-service \
+#          --output yaml \
+#          --containers "{
+#            \"flask\": {
+#              \"image\": \"$LIGHTSAIL_DOCKER_IMAGE\",
+#              \"environment\": {
+#                  \"VERSION\": \"${{github.run_number}}\",
+#                  \"AWS_ACCESS_KEY_ID\": \"${{ secrets.AWS_ACCESS_KEY_ID }}\",
+#                  \"AWS_SECRET_ACCESS_KEY\": \"${{ secrets.AWS_SECRET_ACCESS_KEY }}\"
+#                },
+#              \"ports\": {
+#                \"5000\": \"HTTP\"
+#              }
+#            }
+#          }" \
+#          --public-endpoint "{
+#            \"containerName\": \"flask\",
+#            \"containerPort\": 5000
+#          }"
